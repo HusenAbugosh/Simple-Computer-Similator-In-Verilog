@@ -1,0 +1,128 @@
+
+
+module CPU(clock,MemData,MemOut,rd,wr,PC,IR,MBR,AC,MAR ,SR);
+input clock;
+input [15:0]MemData;
+output reg [15:0]MemOut;
+output PC,IR,MAR ,SR;
+output signed MBR,AC;
+output wr,rd;
+reg signed [15:0]MBR,AC;
+reg [15:0] IR;
+reg [10:0] PC,MAR;
+reg [3:0]SR;// 0: OverFlow, 1:Carry , 2: negative , 3:Zero
+
+reg [2:0] state ;
+parameter Load = 4'b0001 , Store = 4'b0010 , Add = 4'b0011,Sub = 4'b0100 ,Mul = 4'b0101 , Div = 4'b0110 , Branch = 4'b0111 , BRZ = 4'b1000;
+
+initial begin
+PC = 0;
+state =0;
+rd = 1;
+wr=0;
+end
+
+always@(posedge clock)begin
+	case (state)//0
+0:begin 
+  wr=0;rd=1;
+MAR<=PC;
+
+state =1;
+  end 
+	
+1: begin 
+rd=1;
+wr=0;
+IR <= MemData ;
+PC<=PC+1;
+state=2;
+end 
+//*****************
+2:begin 
+if(IR[11] == 1)
+begin
+MAR<=IR[10:0];
+end
+
+state=3;
+
+end
+//************************
+3: begin // operand fetch 
+state = 4;
+if(IR[11] == 1)
+		 begin
+   case (IR[15:12])
+	   Load : MBR <=MemData ;
+	   Add || Sub || Mul || Div : MBR <= MemData;
+	   Store : MBR <= AC;
+	   Branch :
+	   begin
+		 PC <= MAR;
+	   state <= 0;
+	   end
+		 BRZ:
+		 begin
+		 if(SR[3] == 1'b1)
+		 begin
+		  PC <= MAR;
+	   state <= 0;
+		 end
+		 end
+	   endcase 
+	   end 
+		 //*************
+		 else 
+		 begin
+		  case (IR[15:12])
+
+	   Load : MBR <=IR[10:0] ;
+	   Add || Sub || Mul || Div : MBR <=IR[10:0] ;
+	   Store : MBR <= AC;
+	   Branch :
+		 begin
+		 PC <= MAR;
+	   state <= 0;
+	   end
+		 BRZ:
+		 begin
+		 if(SR[3] == 1'b1)
+		 begin
+		  PC <= MAR;
+	   state <= 0;
+		 end
+		 end
+	   endcase 
+	   end  
+		 end
+//******************************* 
+ 4:begin
+  if (IR[15:12]== 4'h1)begin
+AC<=MBR;
+state = 0;
+end  
+else if (IR[15:12]==4'h2)begin
+MemOut<=MBR;
+state = 0;
+end
+else if(IR[15:12]==4'h3)begin
+AC<=AC+MBR;
+state=0;
+end 
+else if(IR[15:12]==4'h4)begin
+AC<=AC-MBR;
+state=0;
+ end 
+ else if(IR[15:12]==4'h5)begin
+AC<=AC*MBR;
+state=0;
+ end 
+ else if(IR[15:12]==4'h6)begin
+AC<=AC/MBR;
+state=0;
+ end 
+	end
+	 endcase
+	 end
+	 endmodule 
